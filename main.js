@@ -2,6 +2,8 @@ var http = require('http');
 var fs = require('fs');
 var url = require('url');
 var qs = require('querystring');
+var path = require('path');
+const sanitizeHtml = require('sanitize-html');
 function templateHTML(title, list, body, control) {
   return `
   <!doctype html>
@@ -9,6 +11,23 @@ function templateHTML(title, list, body, control) {
 <head>
   <title>WEB1 - ${title}</title>
   <meta charset="utf-8">
+  <style>
+  body {
+    width: 500px;
+    height: 500px;
+    background-color: bisque;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen,
+    Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    color: dimgray;
+    list-style-type=circle;
+    
+  }
+  a{
+  text-decoration:none;    
+  color:seagreen;
+  }
+  
+  </style>
 </head>
 <body>
   <h1><a href="/">WEB</a></h1>
@@ -55,27 +74,26 @@ var app = http.createServer(function (request, response) {
       });
     } else {
       fs.readdir('./data', function (error, filelist) {
+        var filteredId = path.parse(queryData.id).base;
         var list = templateList(filelist);
-        fs.readFile(
-          `data/${queryData.id}`,
-          'utf8',
-          function (err, description) {
-            var title = queryData.id;
-            var template = templateHTML(
-              title,
-              list,
-              `<h2>${title}</h2>${description}`,
-              `<a href="/create">create</a>
-              <a href = "/update?id=${title}">update</a>
+        fs.readFile(`data/${filteredId}`, 'utf8', function (err, description) {
+          var title = queryData.id;
+          var sanitizedTitle = sanitizeHtml(title);
+          var sanitizedDescription = sanitizeHtml(description);
+          var template = templateHTML(
+            title,
+            list,
+            `<h2>${sanitizedTitle}</h2>${sanitizedDescription}`,
+            `<a href="/create">create</a>
+              <a href = "/update?id=${sanitizedTitle}">update</a>
               <form action="delete_process" method="post" >
-              <input type = "hidden" name = "id" value="${title}">
+              <input type = "hidden" name = "id" value="${sanitizedTitle}">
               <input type = "submit" value = "delete">
               </form>`
-            );
-            response.writeHead(200);
-            response.end(template);
-          }
-        );
+          );
+          response.writeHead(200);
+          response.end(template);
+        });
       });
     }
   } else if (pathname === '/create') {
@@ -184,7 +202,8 @@ var app = http.createServer(function (request, response) {
     request.on('end', function () {
       var post = qs.parse(body);
       var id = post.id;
-      fs.unlink(`data/${id}`, function (error) {
+      var filteredId = path.parse(id).base;
+      fs.unlink(`data/${filteredId}`, function (error) {
         response.writeHead(302, { Location: `/` });
         response.end();
       });
